@@ -4,7 +4,7 @@ WebAssembly is a true revolution in tech, not just in the web, but thanks to WAS
 One of the best things WebAasembly offers is being a compilation target 
 instead of just another programming language. This has the potential to help a lot of non-JS developers 
 get involved with web development. WebAssembly also has its text version 
-called...guess what? WebAssembly Text, or WAT for short (official docs at Mozilla [here](https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format). It can be compiled to the binary format using [wabt](https://github.com/WebAssembly/wabt).
+called... You got it, WebAssembly Text, or WAT for short! (official docs at Mozilla [here](https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format). It can be compiled to the binary format using [wabt](https://github.com/WebAssembly/wabt).
 
 **WARNING**: This article assumes that you already know how to load and use WebAssembly binaries.
 
@@ -31,7 +31,7 @@ below:
 (module)
 ```
 ## Hello, world! Well, sort of.
-WebAssembly Text files alway start with the module definition and everything else is put between the `module` word and the last parenthesis. Let's see how we can write a simple "Hello, world!" program in WAT.
+WebAssembly Text files always start with the module definition and everything else is put between the `module` word and the last parenthesis. Let's see how we can write a simple "Hello, world!" program in WAT.
 ```wat
 (module
 	(func $hello_world (param $0 i32) (param $1 i32) (result i32)
@@ -40,10 +40,10 @@ WebAssembly Text files alway start with the module definition and everything els
 		i32.add)
 	(export "helloWorld" (func $hello_world)))
 ```
-Okay, you might be saying "What the hell is this? I thought this is a 'Hello, world!' example".
+Okay, you might be saying "What the hell is this? I thought this is a 'Hello, world!' example!".
 Well, the point is that WASM wasn't created to print strings and interact with APIs,
-the reason of its creation was to help JavaScript handle heavy computations
-by providing an interface to fast low level instructions.
+its purpose is to help JavaScript handle heavy computations
+by providing an interface to fast, low level instructions.
 ### But what does the code do?
  - `func` declares a function
  - `$hello_world` is a compile time name/label we give the function (we'll see that later)
