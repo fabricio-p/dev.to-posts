@@ -1,15 +1,15 @@
-# Understanding WebAssembly better by learning WebAssembly-Text
+# Understanding WebAssembly better by learning WebAssembly Text
 
 WebAssembly is a true revolution in tech, not just in the web, but thanks to WASI and friends, it is becoming available everywhere.
 One of the best things WebAasembly offers is being a compilation target 
-instead of just another programming language. This made a lot of developers 
-get involved with web development. But WebAssembly also has its text version 
-called...guess what? WebAssembly-Text, or WAT for short (official docs at Mozilla [here](https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format). It can be compiled to the binary format using [wabt](https://github.com/WebAssembly/wabt).
+instead of just another programming language. This has the potential to help a lot of non-JS developers 
+get involved with web development. WebAssembly also has its text version 
+called...guess what? WebAssembly Text, or WAT for short (official docs at Mozilla [here](https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format). It can be compiled to the binary format using [wabt](https://github.com/WebAssembly/wabt).
 
 **WARNING**: This article assumes that you already know how to load and use WebAssembly binaries.
 
-## Understanding syntax.
-WAT has  LISP syntax and offers two ways of writing code:
+## Understanding the Syntax
+WAT offers two ways of writing code:
 The traditional assembly style
 ```wat
 	local.get 0
@@ -22,16 +22,16 @@ and a more LISPy way
 		(local.get 0)
 		(local.get 1))
 ```
-The compiler will spit out the same result from both of them, but the first
+The assembler will spit out the same result from both of them, but the first
 example shows in a more clear way how the instructions are placed in the
-binary. We will be using the first one, because our goal is to understand how WebAssembly works.
-The most basic, useless but also valid WAT file has at least the contents
+binary. We will be using the latter, because our goal is to understand how WebAssembly works.
+The most basic, valid, (albeit useless) WAT file has the contents
 below:
 ```wat
 (module)
 ```
 ## Hello, world! Well, sort of.
-It always starts with the module definition and everything else is put between the `module` word and the last parenthesy. Lets see how we can write a simple "Hello, world!" program in WAT.
+WebAssembly Text files alway start with the module definition and everything else is put between the `module` word and the last parenthesis. Let's see how we can write a simple "Hello, world!" program in WAT.
 ```wat
 (module
 	(func $hello_world (param $0 i32) (param $1 i32) (result i32)
@@ -40,12 +40,11 @@ It always starts with the module definition and everything else is put between t
 		i32.add)
 	(export "helloWorld" (func $hello_world)))
 ```
-Okay, you might be saying "What the hell is this? I thought it would be a hello world example".
-Well, the point is that WASM wasn't created to print string and stuff,
+Okay, you might be saying "What the hell is this? I thought this is a 'Hello, world!' example".
+Well, the point is that WASM wasn't created to print strings and interact with APIs,
 the reason of its creation was to help JavaScript handle heavy computations
-by providing an interface to really low level stuff. A hello world example is
-to show a silly example that something works. Thats what this one over here does.
-Now, what does this code do ?
+by providing an interface to fast low level instructions.
+### But what does the code do?
  - `func` declares a function
  - `$hello_world` is a compile time name/label we give the function (we'll see that later)
  - `(param $0 i32)` and `(param $1 i32)` tell that this function accepts two parameters, the first one labeled $0 (notice the `$`) with a type `i32`,
