@@ -1,4 +1,4 @@
-# Understanding WebAssembly better by learning WebAssembly-Tezt
+# Understanding WebAssembly better by learning WebAssembly-Text
 
 WebAssembly is a true revolution in tech, not just in the web, but thanks to WASI and friends, it is becoming available everywhere.
 One of the best things WebAasembly offers is being a compilation target 
