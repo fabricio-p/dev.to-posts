@@ -78,7 +78,7 @@ distance between two points using Pythagoras formula.
 			(param $x2 i32) (param $y2 i32) (result f64)
 		local.get $x1
 		local.get $x2
-		i32.sub ; calculate the X axis distance (a)
+		i32.sub ;; calculate the X axis distance (a)
 		call $square ;; (a ^ 2)
 
 		local.get $y1
