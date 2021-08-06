@@ -79,15 +79,15 @@ distance between two points using Pythagoras formula.
 		local.get $x1
 		local.get $x2
 		i32.sub ; calculate the X axis distance (a)
-		call $square ; (a ^ 2)
+		call $square ;; (a ^ 2)
 
 		local.get $y1
 		local.get $y2
-		i32.sub ; calculate the Y axis distance (b)
-		call $square ; (b ^ 2)
+		i32.sub ;; calculate the Y axis distance (b)
+		call $square ;; (b ^ 2)
 
-		i32.add ; (c^2 = a^2 + b^2)
-		f64.convert_s/i32 ; convert to f64 so we can square root
+		i32.add ;; (c^2 = a^2 + b^2)
+		f64.convert_s/i32 ;; convert to f64 so we can square root
 		f64.sqrt)
 	(export "distance" (func $distance))
 	(func $square (param $i32) (result i32)
@@ -96,7 +96,7 @@ distance between two points using Pythagoras formula.
 		i32.mul))
 ```
 ### Breaking down the code (again)
- - `;` is a single line comment
+ - `;;` is a the start of a single line comment
  - `i32.sub` pops two numbers of type `i32` from the stack and pushes back the
  	result of their subtraction
  - `call $square` calls a function
