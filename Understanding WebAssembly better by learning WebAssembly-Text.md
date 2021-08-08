@@ -56,12 +56,18 @@ an interface to fast, low level instructions.
  - `i32.add` pops two values of type `i32` from the stack and pushes the result of their addition back into the stack.
  - `(export "helloWorld" (func $hello_world))` exports the function labeled as `$hello_world` to the host with the name "helloWorld".
 
-## What does a "label" actually mean?
+### Where is the `return` statement
+WebAssembly has a `return` instruction, but it is mostly used when you need
+to immediatly return and stop executing the function any further. Otherwise,
+there will be an implicit return, where the last value is poped from the stack
+and returned.
+
+### What does a "label" actually mean?
 All the function calls, parameter and local acces are done by index. Labels
 are just compile-time annotations to make code easier to read, write and
 understand.
 
-## Are `local.get` and `i32.add` the only instructions?
+### Are `local.get` and `i32.add` the only instructions?
 Of course not. The WebAssembly instruction set is really big. Just the MVP
 has around 120 instructions. Most of them start with the type, which can only
 be `i32`, `i64`, `f32`, `f64`, followed by a dot and the name of the
@@ -76,6 +82,7 @@ distance between two points using Pythagoras formula.
 (module
 	(func $distance (param $x1 i32) (param $y1 i32)
 			(param $x2 i32) (param $y2 i32) (result f64)
+
 		local.get $x1
 		local.get $x2
 		i32.sub ;; calculate the X axis distance (a)
@@ -111,4 +118,66 @@ distance between two points using Pythagoras formula.
    result of their multiplication.
    (we multiply a number with himself to get its power of 2 in the `$square` function).
 
-## Globals, linear memory and other low level stuff
+## Decision making
+Although WebAssembly is a low level bytecode format, it supports higher level
+concepts like if statements and loops. The code below shows a function
+that recives two `i32` as parameters and returns the largest of them.
+```wat
+(module
+	(func $largest (param $0 i32) (param $1 i32) (result i32)
+		local.get $0 ;; pushing $0's value into the stack
+		local.get $1 ;; pushing $1's value into the stack
+		i32.gt_s ;; comparing if $0 is greater than $1
+		if (result i32)
+			local.get $0
+		else
+			local.get $1
+		end)
+	(export "largest" (func $largest)))
+```
+The 3 first instructions are enough simple to be explained with comments,
+otherwise:
+ - `local.get $0` and `local.get $1` push the values of the parameters labeled
+   `$0` and `$1`
+ - `i32.gt_s` pops two values of type `i32` from the stack and pushes back
+   the result of their comparison (value of `param $0` is greater than the
+   valule of `param $1`). `1` if true, `0` if false. It has the `_s` suffix
+   because it compares the numbers as signed ones (i.e they can be negative).
+
+### To return `$0` or to return `$1`
+When an `if` instruction occurs, the last item in the stack is poped. It needs
+an `i32`. If it is different from `0` the instructions inside the `if..else/end` block are executed, otherwise the `else..end` is executed. If there isn't
+an `else`, simply nothing is executed.
+You might notice that the if "statement" has a result. That is done because
+when an `if` instruction is executed, the stack is marked/splited at the
+current stack top and a new isolated empty stack context is created, which we
+will call the child stack. When the `if` block is executed, the last item in
+the child stack is poped, that stack is unwinded and destroyed and the poped
+item is pushed to the parent stack. Thats how functions worok, but when
+a function is executed, the parameters are first consumed from the parent
+stack.
+
+### Select
+For simple decisions `if` might be a bit overkill. There is also a `select`
+instruction which works like a ternary operator. If we would use `select`
+
+instead of `if`, we would do it like this.
+```wat
+local.get $0
+local.get $1 ;; push value of $0 and $1 into stack for selection
+local.get $0
+local.get $1 ;; push value of $0 and $1 into stack for comparing
+i32.gt_s ;; doing the comparison between the two last `i32` items on the stack
+select
+```
+The `select` instruction pops 3 values from the stack. It decides which of
+the two first values to push back according to the third one. (if the third
+one is not `0`, push the first one, otherwise the second one.
+
+<!-- ## Looping and branching
+-->
+
+<!-- ## Globals, linear memory and other low level stuff
+WebAssembly offers another way to store data except the stack, the linear
+memory. It can be seen as a resizable JavaScript TypeArray. Its main
+purpouse is to store complex and/or continous data. -->
