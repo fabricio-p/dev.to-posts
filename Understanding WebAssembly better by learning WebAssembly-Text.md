@@ -174,8 +174,60 @@ The `select` instruction pops 3 values from the stack. It decides which of
 the two first values to push back according to the third one. (if the third
 one is not `0`, push the first one, otherwise the second one.
 
-<!-- ## Looping and branching
--->
+## Looping and branching
+WebAssembly supports loops but not the kind of loops you might be thinking
+about. Take this code for example:
+```wat
+(module
+	(func $fac (param $0 i32) (result i32) (local $acc i32)
+		local.get $0
+		local.set $acc
+		block $outer
+			loop $loop
+				local.get $acc
+				i32.const 1
+				i32.le_u
+				br_if $outer
+				local.get $acc
+				local.get $acc
+				i32.const 1
+				i32.sub
+				i32.add
+				local.set $acc
+				br $loop
+			end
+		end
+		local.get $acc)
+	(export "factorial" (func $fac)))
+```
+This code shows how to write a function that finds the factorial of a number
+using a loop. It could have been easier to use recursion, but the point here
+is to understand loops and branching.
+
+### Looping and breaking down code...
+Most of the things in this code have been explained. The only new things
+here are `(local $acc i32)`, `block`, `loop`, `br_if $outer` and `$br $loop`.
+ - `(local $acc i32)` is like what thry call a local variable in higher level
+   languages. It is accessed the same way as the parameters, and the first
+   local has the smallest index that is not a parameter.
+ - `block $outer` works kind of like `if`, in fact, `if` and `loop` are like
+   specialized `block` instruction. The difference is that `block` does not do
+   anything special, it just splits the stack and is usually used for general
+   purpouse control flow.
+   in code so you can branch out.
+ - `loop $loop` behaves like a `block`, but if you do a branch on a `loop`,
+   you don't go at the `end`, you go at the top (branches behave like break
+   on `block`s and like continue on `loop`s)
+ - `br_if $outer` is a conditional branch/jump instruction. If you know
+   C/C++ you know about jumping using `goto`. But using `goto` you can jump
+   every way, everywhere from every part of the code. WebAssembly is more
+   restrictive. You can branch only out. The labels are there to make 
+   the code easier to read. Without them, it would have been `br_if 1`.
+   As most of the things in WebAssembly, branching is achieved by indexes.
+   Indexing starts from the innermost to the outermost `block`. Which means
+   that the `loop` has an index `0`.
+ - `br $loop` is an unconditional branch. It operates on a `loop`, so
+   it will go at the top wherw the `loop` instruction occurs.
 
 <!-- ## Globals, linear memory and other low level stuff
 WebAssembly offers another way to store data except the stack, the linear
