@@ -153,7 +153,7 @@ when an `if` instruction is executed, the stack is marked/splited at the
 current stack top and a new isolated empty stack context is created, which we
 will call the child stack. When the `if` block is executed, the last item in
 the child stack is poped, that stack is unwinded and destroyed and the poped
-item is pushed to the parent stack. Thats how functions worok, but when
+item is pushed to the parent stack. Thats how functions work, but when
 a function is executed, the parameters are first consumed from the parent
 stack.
 
@@ -207,14 +207,13 @@ is to understand loops and branching.
 ### Looping and breaking down code...
 Most of the things in this code have been explained. The only new things
 here are `(local $acc i32)`, `block`, `loop`, `br_if $outer` and `$br $loop`.
- - `(local $acc i32)` is like what thry call a local variable in higher level
+ - `(local $acc i32)` is like what they call a local variable in higher level
    languages. It is accessed the same way as the parameters, and the first
    local has the smallest index that is not a parameter.
  - `block $outer` works kind of like `if`, in fact, `if` and `loop` are like
    specialized `block` instruction. The difference is that `block` does not do
    anything special, it just splits the stack and is usually used for general
    purpouse control flow.
-   in code so you can branch out.
  - `loop $loop` behaves like a `block`, but if you do a branch on a `loop`,
    you don't go at the `end`, you go at the top (branches behave like break
    on `block`s and like continue on `loop`s)
