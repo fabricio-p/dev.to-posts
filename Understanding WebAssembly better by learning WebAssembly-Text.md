@@ -27,9 +27,9 @@ and a more LISPy way (called S-Expression format)
 ```
 The assembler will spit out the same result from both of them, but the first
 example shows in a more clear way how the instructions are placed in the
-binary. We will be using the former in this article, so we can get used to how a stack machine works.
-The most basic, valid, (albeit useless) WAT file has the contents
-below:
+binary. We will be using the former in this article, so we can get used to how
+a stack machine works.
+The most basic, valid, (albeit useless) WAT file has the contents below:
 ```wat
 (module)
 ```
@@ -59,11 +59,36 @@ an interface to fast, low level instructions.
  - `i32.add` pops two values of type `i32` from the stack and pushes the result of their addition back into the stack.
  - `(export "helloWorld" (func $hello_world))` exports the function labeled as `$hello_world` to the host with the name "helloWorld".
 
-### Where is the `return` statement
+### How WebAssembly's stack works
+A stack is nothing more than just a LIFO (last in, first out) linear data
+structure. It is called so because items can only be inserted/pushed and
+removed/popped from the back. The stack has a bottom and a top.
+If you are a JavaScript developer, imagine it as an `Array` where you can only
+do `push` and `pop` and can't access the items in any other way.
+WebAsembly's stack is no difference, but it has a few features which make it
+cooler and safer.
+One of the is stack spliting/framing. The name may look scary, but it is
+simpler than it looks. It just puts a mark at the place where the stack top
+is on the moment it is splitted. The mark is the bottom of the new frame 
+and it simply says "Hey, this is a stack of its own that this **block** of
+code here operates on. Only this block of code has access to it and nothing
+else, and its lifetime is limited to the time that this block of code requires
+to be fully executed".
+We are going to call the stack that is splited the parent frame and the new
+stack that resulted from the split the child frame.
+A **block** is called the part between a `block`/`if`/`loop` instruction
+and an `end` instruction. Every **block** can have a result, which means
+that befor the frame that was created for that **block** reaches the end of
+its lifetime, the last item is popped. Then that frame is desteoyed (i.e. the
+mark is removed) and the popped item is pushed to the parent frame.
+That's how functions work too, but thay can have parameters and they can
+be executed at any time.
+
+### Where is the `return` statement?
 WebAssembly has a `return` instruction, but it is mostly used when you need
 to immediatly return and stop executing the function any further. Otherwise,
-there will be an implicit return, where the last value is popped from the stack
-and returned.
+there will be an implicit return, where the last value is popped from the
+stack and returned.
 
 ### What does a "label" actually mean?
 All the function calls, parameter and local access are done by index. Labels
@@ -74,9 +99,9 @@ understand.
 Of course not. The WebAssembly instruction set is *huge*. Just the MVP (minimal viable product)
 has around 120 instructions. Most of them start with the type, which can only
 be `i32`, `i64`, `f32`, `f64`, followed by a dot and the name of the
-operation. There are also instructions for other purpouses, like control flow,
-branching, jumping and looping. A list of all the instructions and their
-explanation can be found [here](https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md#instructions).
+operation. There are also instructions for other purpouses, like control flow
+(decision making, branching/jumping and looping).
+A list of all the instructions and their explanation can be found [here](https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md#instructions).
 
 ## Writing something useful
 The example below shows how you can write a function that calculates the
@@ -120,6 +145,26 @@ distance between two points using Pythagorean theorem.
    result of their multiplication.
    (we multiply a number with himself to get its power of 2 in the `$square` function).
 
+## Globals
+Globals are just "variables" that all the functions can access. They can be
+mutated only if they are declared as mutable.  They can be exported. The code
+below shows a way how they can be used:
+```wat
+(module
+	(;
+	  declare a mutable global with type `i32` and initial value 0
+	;)
+	(global $counter (mut i32) (i32.const 0))
+	(export "counter" (global $counter)) ;; export it with the name "counter"
+	(func $countUp (result i32)
+		global.get $counter ;; push the value of $counter into the stack
+		i32.const 1
+		i32.add ;; increment the value by 1
+		global.set $counter ;; assign $counter to the incremented value
+		global.get $counter) ;; return the new incremented value
+	(export "countUp" (func $countUp)))
+```
+
 ## Decision making
 Although WebAssembly is a low level bytecode format, it supports higher level
 concepts like if statements and loops. The code below shows a function
@@ -137,7 +182,8 @@ that recives two `i32` as parameters and returns the largest of them.
 		end)
 	(export "largest" (func $largest)))
 ```
-The 3 first instructions are simple enough to be explained with comments.
+The 3 first instructions are simple enough to be explained with comments, or
+if you still don't understand what they do:
  - `local.get $0` and `local.get $1` push the values of the parameters labeled
    `$0` and `$1`
  - `i32.gt_s` pops two values of type `i32` from the stack and pushes back
@@ -146,23 +192,19 @@ The 3 first instructions are simple enough to be explained with comments.
    because it compares the numbers as signed ones (i.e. they can be negative).
 
 ### To return `$0` or to return `$1`
-When an `if` instruction occurs, the last item in the stack is popped. It needs
-an `i32`. If it is different from `0` the instructions inside the `if..else/end` block are executed, otherwise the `else..end` is executed. If there isn't
-an `else`, simply nothing is executed.
-You might notice that the if "statement" has a result. That is because
-when an `if` instruction is executed, the stack is marked/split at the
-current stack top and a new isolated empty stack context is created, which we
-will call the child stack. When the `if` block is executed, the last item in
-the child stack is popped, that stack is unwinded and destroyed and the poped
-item is pushed to the parent stack. Thats how functions work, but when
-a function is executed, the parameters are first consumed from the parent
-stack.
+When an `if` instruction occurs, the last item in the stack, which is the
+condition is popped. It needs to be an `i32`. If it is different from `0` the
+instructions inside the `if..else/end` block are executed, otherwise the
+`else..end` is executed. If there isn't an `else`, simply nothing happens.
+You might notice that the if "statement" has a result. If you remember when
+I said that `if` is something called a **block**, which means it is an
+instruction that will create a new stack frame that the code between it and
+the `else`/`end` will use..
 
 ### Select
-For simple decisions `if` might be a bit overkill. There is also a `select`
-instruction which works like a ternary operator. To use `select`
-
-instead of `if`, we would do it like this.
+For simple decisions like picking a number, `if` might be a bit overkill.
+There is also a `select` instruction which works like a ternary operator.
+To use `select` instead of `if`, we would do it like this.
 ```wat
 local.get $0
 local.get $1 ;; push value of $0 and $1 into stack for selection
@@ -181,18 +223,22 @@ about. Take this code for example:
 ```wat
 (module
 	(func $fac (param $0 i32) (result i32) (local $acc i32)
+		(local $num i32)
+
 		local.get $0
-		local.set $acc
+		local.tee $acc
+		local.set $num
 		block $outer
 			loop $loop
-				local.get $acc
+				local.get $num
 				i32.const 1
-				i32.le_u
+				i32.lt_u ;; we check if $num is lower than 1
 				br_if $outer
 				local.get $acc
-				local.get $acc
+				local.get $num
 				i32.const 1
 				i32.sub
+				local.tee $num
 				i32.add
 				local.set $acc
 				br $loop
@@ -211,21 +257,92 @@ here are `(local $acc i32)`, `block`, `loop`, `br_if $outer` and `$br $loop`.
  - `(local $acc i32)` is like what they call a local variable in higher level
    languages. It is accessed the same way as the parameters, and the first
    local has the smallest assigned index that is not already assigned to a parameter.
- - `block $outer` works kind of like `if`, in fact, `if` and `loop` are like a
-   specialized `block` instruction. The difference is that `block` does not do
-   anything special, it just splits the stack and is usually used for general
-   purpose control flow.
- - `loop $loop` behaves like a `block`, but if you do a branch on a `loop`,
+ - `block $outer` does nothing special, it just  encapsulates the code
+   between it and the corresponding `end` instruction. It is used when you
+   need to branch outnat different levels.
+ - `loop $loop` is a special kind of **block**, if you do a branch on that,
    you don't go at the `end`, you go to the top (branches behave like `break`
-   on `block`s and like `continue` on `loop`s)
- - `br_if $outer` is a conditional branch/jump instruction. If you know
-   C/C++ you know about jumping using `goto`, but by using `goto` you can jump
-   anywhere, from anywhere in the code. WebAssembly is more
-   restrictive in that you can branch only outwards. 
+   on `block` and `if` and like `continue` on `loop`)
  - `br $loop` is an unconditional branch. It operates on a `loop`, so
-   it will jump to the top where the `loop` instruction occurs.
+   it will jump to the top where the `loop` instruction occurs. If you know
+   C/C++ you know about jumping using `goto`, but by using `goto` you can jump
+   anywhere, from anywhere in the code. WebAssembly is more restrictive in 
+   the way that you can branch only outwards and by index. The innermost
+   **block** has the smallest index (`0`) and the outermost has the largest.
+   We do the branch so we can continue looping instead of dropping out.
+ - `br_if $outer` is a conditional branch/jump instruction. It will pop the
+   last item from the stack (the condition, has to be an `i32`) and if it is
+   different from `0`, it will execute the branch, otherwise it won't.
 
-<!-- ## Globals, linear memory and other low level stuff
+## Linear memory
 WebAssembly offers another way to store data except the stack, the linear
-memory. It can be seen as a resizable JavaScript TypeArray. Its main
-purpouse is to store complex and/or continous data. -->
+memory. It can be seen as a resizable JavaScript `TypeArray`. Its main
+purpouse is to store complex and/or continous data. There are 14 load and
+9 store instructions, and 2 other instructions for manipulating and getting
+its size. With what we have learned until now, lets implement a function
+that generates a fibonacci sequence.
+```wat
+(module
+	(memory 1)
+	(export "memory" (memory 0))
+	(func $fib (param $length i32) (local $offset i32)
+		i32.const 8
+		local.set $offset ;; assign offset to 8 (see below)
+		i32.const 0
+		i32.const 1
+		i32.store offset=4 ;; store 1 at offset 0 eith static offset 4
+		block $block
+			loop $loop
+				local.get $offset
+				i32.const 2
+				i32.shr_u ;; shift 2 bits to the right (read below)
+				local.get $length
+				i32.gt_u ;; compare the requsted length
+				br_if $block ;; break out if false (`9`)
+				local.get $offset ;; get the offset for storing
+				local.get $offset
+				;; ---------
+				i32.const 8
+				i32.sub
+				i32.load
+				local.get $offset
+				i32.const 4
+				i32.sub
+				i32.load
+				i32.add ;; load the two previouse numbers from memory and add them
+				;; ---------
+				i32.store ;; store the number at the current offset
+				local.get $offset
+				i32.const 4
+				i32.add
+				local.set $offset ;; increment the offset by 4
+				br $loop
+			end
+		end)
+	(export "fibonacci" (func $fib)))
+```
+
+### Explaining a few things
+The code above uses almost all the knowledge that you have gained while
+reading this article. A few things to note:
+ - `store offset=4` stores an `i32`. It pops two items from the stack. The
+   first one is the address/offset and the second is the value that will be
+   stored. `offset=4` is a static offset, which means it will add that to the
+   offset that it gets from the stack, without you needing to do
+   `i32.const 4` and `i32.add` on the offset (this was used so that you know
+   what it is, but it useless since the offset is static (we know it)).
+ - We use the offset instead of the index, because we don't have fancy things
+   like arrays. Each number takes up to 4 bytes and we have te increment the
+   offset by `4` instead of `1`.
+ - The offset points at the address in memory where the number that will
+   result from the addition of the two previous numbers will be stored,
+   thats why it is initially 8.
+ - We do a right-bit-shift of `2` to the offset when comparing that to the
+   requested length of the sequence, because we are comparing it as an index.
+   It is the same as dividing it by `4` and getting a full number instead of
+   a decimal.
+
+## The end.
+I hope that this article gave you a deeper understanding on how WebAssembly
+works. A big thanks to [Roman. F](https://github.com/romdotdog) who edited and
+corrected my article.
