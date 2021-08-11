@@ -46,8 +46,8 @@ and it simply says "Hey, this is a stack of its own that this **block** of
 code here operates on. Only this block of code has access to it and nothing
 else. The new stack's lifetime is limited to the time that this block of code requires
 to be fully executed".
-We are going to call the stack that is split between the parent frame and the new
-stack the child frame.
+We are going to call the stack that is split the parent frame and the new
+stack that results from the split the child frame.
 A **block** is the part between a `block`/`if`/`loop` instruction
 and an `end` instruction. Every **block** can have a result, which means
 that when the block's stack frame reaches the end of
@@ -274,7 +274,7 @@ here are `(local $acc i32)`, `block`, `loop`, `br_if $outer` and `$br $loop`.
 WebAssembly offers another way to store data other than the stack, the linear
 memory. It can be seen as a resizable JavaScript `TypeArray`. Its main
 purpose is to store complex and/or continous data. There are 14 load and
-9 store instructions, and 2 other instructions for manipulation and getting
+9 store instructions, and 2 other instructions for manipulating and getting
 its size. With what we have learned until now, let's implement a function
 that generates the fibonacci sequence.
 ```wat
@@ -290,8 +290,8 @@ that generates the fibonacci sequence.
 		block $block
 			loop $loop
 				local.get $offset
-				i32.const 2
-				i32.shr_u ;; shift 2 bits to the right (read below)
+				i32.const 4
+				i32.div ;; divide by 4(read below)
 				local.get $length
 				i32.gt_u ;; compare the requsted length
 				br_if $block ;; break out if false (`9`)
@@ -333,10 +333,7 @@ reading this article. A few things to note:
  - The offset variable points at the address in memory where the number that will
    result from the addition of the two previous numbers will be stored,
    thats why it is initially 8. Two `i32`s take 8 bytes in memory.
- - ~~We do a right-bit-shift of `2` to the offset when comparing that to the
-   requested length of the sequence, because we are comparing it as an index.
-   It is the same as dividing it by `4` and getting a full number instead of
-   a decimal.~~ TODO: Replace with division
+ - We divide the offset by 4 when comparing it, to have it like an "index".
 
 ## The end.
 I hope that this article gave you a deeper understanding on how WebAssembly
