@@ -25,14 +25,37 @@ and a more LISPy way (called S-Expression format)
 		(local.get 0)
 		(local.get 1))
 ```
-The assembler will spit out the same result from both of them, but the first
-example shows in a more clear way how the instructions are placed in the
-binary. We will be using the former in this article, so we can get used to how
-a stack machine works.
+The assembler will spit out the same result from both of them, but the former 
+shows in a more clear way how the instructions are placed in the
+binary. We will be using that style in this article.
 The most basic, valid, (albeit useless) WAT file has the contents below:
 ```wat
 (module)
 ```
+
+## How WebAssembly's stack works
+A stack is nothing more than just a LIFO (last in, first out) linear data
+structure. Imagine it as an array where you can only
+`push` and `pop` and can't access the items in any other way.
+WebAsembly's stack is no difference, but it has a few features which make it
+cooler and safer.
+One of which is stack splitting/framing. The name may look scary, but it is
+simpler than it looks. It just puts a mark at the place where the item at the 
+top of the stack is on the moment it is split. The mark is the bottom of the new frame 
+and it simply says "Hey, this is a stack of its own that this **block** of
+code here operates on. Only this block of code has access to it and nothing
+else. The new stack's lifetime is limited to the time that this block of code requires
+to be fully executed".
+We are going to call the stack that is split between the parent frame and the new
+stack the child frame.
+A **block** is the part between a `block`/`if`/`loop` instruction
+and an `end` instruction. Every **block** can have a result, which means
+that when the block's stack frame reaches the end of
+its lifetime, the last item is popped. Then that frame is destroyed (i.e. the
+mark is removed) and the popped item is pushed to the parent frame.
+That's how functions work too, but they can have parameters and can
+be executed at any time.
+
 ## Hello, world! Well, sort of.
 WebAssembly Text files always start with the module definition and everything else is put between the `module` word and the last parenthesis. Let's see how we can write a simple "Hello, world!" program in WAT.
 ```wat
@@ -59,36 +82,11 @@ an interface to fast, low level instructions.
  - `i32.add` pops two values of type `i32` from the stack and pushes the result of their addition back into the stack.
  - `(export "helloWorld" (func $hello_world))` exports the function labeled as `$hello_world` to the host with the name "helloWorld".
 
-### How WebAssembly's stack works
-A stack is nothing more than just a LIFO (last in, first out) linear data
-structure. It is called so because items can only be inserted/pushed and
-removed/popped from the back. The stack has a bottom and a top.
-If you are a JavaScript developer, imagine it as an `Array` where you can only
-do `push` and `pop` and can't access the items in any other way.
-WebAsembly's stack is no difference, but it has a few features which make it
-cooler and safer.
-One of the is stack spliting/framing. The name may look scary, but it is
-simpler than it looks. It just puts a mark at the place where the stack top
-is on the moment it is splitted. The mark is the bottom of the new frame 
-and it simply says "Hey, this is a stack of its own that this **block** of
-code here operates on. Only this block of code has access to it and nothing
-else, and its lifetime is limited to the time that this block of code requires
-to be fully executed".
-We are going to call the stack that is splited the parent frame and the new
-stack that resulted from the split the child frame.
-A **block** is called the part between a `block`/`if`/`loop` instruction
-and an `end` instruction. Every **block** can have a result, which means
-that befor the frame that was created for that **block** reaches the end of
-its lifetime, the last item is popped. Then that frame is desteoyed (i.e. the
-mark is removed) and the popped item is pushed to the parent frame.
-That's how functions work too, but thay can have parameters and they can
-be executed at any time.
-
 ### Where is the `return` statement?
-WebAssembly has a `return` instruction, but it is mostly used when you need
-to immediatly return and stop executing the function any further. Otherwise,
-there will be an implicit return, where the last value is popped from the
-stack and returned.
+WebAssembly has a `return` instruction, but it is only used when you need
+to immediately return and stop executing the function any further. Otherwise,
+there will be an implicit return at the end of the function that pops the last
+value on the stack and returns it.
 
 ### What does a "label" actually mean?
 All the function calls, parameter and local access are done by index. Labels
@@ -146,9 +144,9 @@ distance between two points using Pythagorean theorem.
    (we multiply a number with himself to get its power of 2 in the `$square` function).
 
 ## Globals
-Globals are just "variables" that all the functions can access. They can be
-mutated only if they are declared as mutable.  They can be exported. The code
-below shows a way how they can be used:
+Globals are just "variables" that every function can access. 
+They can be exported but can only be mutated if they are declared as mutable. 
+The code below shows a way how they can be used:
 ```wat
 (module
 	(;
@@ -182,7 +180,7 @@ that recives two `i32` as parameters and returns the largest of them.
 		end)
 	(export "largest" (func $largest)))
 ```
-The 3 first instructions are simple enough to be explained with comments, or
+The 3 first instructions are simple enough to be explained with comments, but
 if you still don't understand what they do:
  - `local.get $0` and `local.get $1` push the values of the parameters labeled
    `$0` and `$1`
@@ -192,14 +190,12 @@ if you still don't understand what they do:
    because it compares the numbers as signed ones (i.e. they can be negative).
 
 ### To return `$0` or to return `$1`
-When an `if` instruction occurs, the last item in the stack, which is the
-condition is popped. It needs to be an `i32`. If it is different from `0` the
+When an `if` instruction occurs, the last item in the stack (the
+condition) is popped. It must be an `i32`. If the condition is not `0`, the
 instructions inside the `if..else/end` block are executed, otherwise the
-`else..end` is executed. If there isn't an `else`, simply nothing happens.
-You might notice that the if "statement" has a result. If you remember when
-I said that `if` is something called a **block**, which means it is an
-instruction that will create a new stack frame that the code between it and
-the `else`/`end` will use..
+`else..end` is executed. If there isn't an `else`, nothing happens.
+You might notice that the if "statement" has a result. `if` is a **block**, 
+which means it is able to return a result.
 
 ### Select
 For simple decisions like picking a number, `if` might be a bit overkill.
@@ -218,8 +214,8 @@ the two first values to push back according to the third one (the condition).
 (if the condition is not `0`, push the first value, otherwise the second).
 
 ## Looping and branching
-WebAssembly supports loops but not the kind of loops you might be thinking
-about. Take this code for example:
+WebAssembly supports loops, but not the kind of loops you might be thinking
+of. Take this code for example:
 ```wat
 (module
 	(func $fac (param $0 i32) (result i32) (local $acc i32)
@@ -251,23 +247,23 @@ This code shows how to write a function that finds the factorial of a number
 using a loop. It could have been easier to use recursion, but the point here
 is to understand loops and branching.
 
-### Looping and breaking down code...
+### Breaking down the code
 Most of the things in this code have been explained. The only new things
 here are `(local $acc i32)`, `block`, `loop`, `br_if $outer` and `$br $loop`.
- - `(local $acc i32)` is like what they call a local variable in higher level
-   languages. It is accessed the same way as the parameters, and the first
-   local has the smallest assigned index that is not already assigned to a parameter.
- - `block $outer` does nothing special, it just  encapsulates the code
+ - `(local $acc i32)` is similar to what they call a local variable in higher level
+   languages. It is accessed the same way as the parameters. The first
+   local's index is 1 more than the last parameter's index.
+ - `block $outer` does nothing special, it just encapsulates the code
    between it and the corresponding `end` instruction. It is used when you
-   need to branch outnat different levels.
- - `loop $loop` is a special kind of **block**, if you do a branch on that,
-   you don't go at the `end`, you go to the top (branches behave like `break`
-   on `block` and `if` and like `continue` on `loop`)
- - `br $loop` is an unconditional branch. It operates on a `loop`, so
+   need to branch out at different levels.
+ - `loop $loop` is a special kind of **block**, if you do a branch on a loop,
+   you don't go at the `end`, you go to the beginning of the loop.
+   (branches behave like `break` on a `block` and `if` and like `continue` on a `loop`)
+ - `br $loop` is an unconditional branch. The label operand is a `loop`, so
    it will jump to the top where the `loop` instruction occurs. If you know
    C/C++ you know about jumping using `goto`, but by using `goto` you can jump
    anywhere, from anywhere in the code. WebAssembly is more restrictive in 
-   the way that you can branch only outwards and by index. The innermost
+   the way that you can branch only outwards and by label / index. The innermost
    **block** has the smallest index (`0`) and the outermost has the largest.
    We do the branch so we can continue looping instead of dropping out.
  - `br_if $outer` is a conditional branch/jump instruction. It will pop the
@@ -275,12 +271,12 @@ here are `(local $acc i32)`, `block`, `loop`, `br_if $outer` and `$br $loop`.
    different from `0`, it will execute the branch, otherwise it won't.
 
 ## Linear memory
-WebAssembly offers another way to store data except the stack, the linear
+WebAssembly offers another way to store data other than the stack, the linear
 memory. It can be seen as a resizable JavaScript `TypeArray`. Its main
-purpouse is to store complex and/or continous data. There are 14 load and
-9 store instructions, and 2 other instructions for manipulating and getting
-its size. With what we have learned until now, lets implement a function
-that generates a fibonacci sequence.
+purpose is to store complex and/or continous data. There are 14 load and
+9 store instructions, and 2 other instructions for manipulation and getting
+its size. With what we have learned until now, let's implement a function
+that generates the fibonacci sequence.
 ```wat
 (module
 	(memory 1)
@@ -309,7 +305,7 @@ that generates a fibonacci sequence.
 				i32.const 4
 				i32.sub
 				i32.load
-				i32.add ;; load the two previouse numbers from memory and add them
+				i32.add ;; load the two previous numbers from memory and add them
 				;; ---------
 				i32.store ;; store the number at the current offset
 				local.get $offset
@@ -329,20 +325,20 @@ reading this article. A few things to note:
    first one is the address/offset and the second is the value that will be
    stored. `offset=4` is a static offset, which means it will add that to the
    offset that it gets from the stack, without you needing to do
-   `i32.const 4` and `i32.add` on the offset (this was used so that you know
-   what it is, but it useless since the offset is static (we know it)).
+   `i32.const 4` and `i32.add` on the offset. In this example, `offset` was only 
+   used for demonstrative purposes.
  - We use the offset instead of the index, because we don't have fancy things
-   like arrays. Each number takes up to 4 bytes and we have te increment the
+   like arrays. Each `i32` takes 4 bytes and we have to increment the
    offset by `4` instead of `1`.
- - The offset points at the address in memory where the number that will
+ - The offset variable points at the address in memory where the number that will
    result from the addition of the two previous numbers will be stored,
-   thats why it is initially 8.
- - We do a right-bit-shift of `2` to the offset when comparing that to the
+   thats why it is initially 8. Two `i32`s take 8 bytes in memory.
+ - ~~We do a right-bit-shift of `2` to the offset when comparing that to the
    requested length of the sequence, because we are comparing it as an index.
    It is the same as dividing it by `4` and getting a full number instead of
-   a decimal.
+   a decimal.~~ TODO: Replace with division
 
 ## The end.
 I hope that this article gave you a deeper understanding on how WebAssembly
-works. A big thanks to [Roman. F](https://github.com/romdotdog) who edited and
-corrected my article.
+works. A big thanks to [rom](https://github.com/romdotdog) who edited and
+corrected my article a few times.
